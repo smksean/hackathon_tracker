@@ -623,23 +623,23 @@ def update_leaderboard(data_json):
         
         if team in team_scores:
             if score_type == 'ml':
-                r2 = float(score.get('r2_score', 0))
-                rmse = float(score.get('rmse', 0))
-                mse = float(score.get('mse', 0))
+                r2 = float(score.get('r2_score', 0) or 0)
+                rmse = float(score.get('rmse', 0) or 0)
+                mse = float(score.get('mse', 0) or 0)
                 ml_score = calculate_ml_score(rmse, mse, r2)
                 team_scores[team]['ml_score'] += ml_score
                 team_scores[team]['ml_count'] += 1
             elif score_type == 'llm':
-                creativity = float(score.get('creativity', 0))
-                accuracy = float(score.get('accuracy', 0))
-                speed = float(score.get('speed', 0))
+                creativity = float(score.get('creativity', 0) or 0)
+                accuracy = float(score.get('accuracy', 0) or 0)
+                speed = float(score.get('speed', 0) or 0)
                 llm_score = calculate_llm_score(creativity, accuracy, speed)
                 team_scores[team]['llm_score'] += llm_score
                 team_scores[team]['llm_count'] += 1
             elif score_type == 'analysis':
-                quality = float(score.get('quality', 0))
-                completeness = float(score.get('completeness', 0))
-                innovation = float(score.get('innovation', 0))
+                quality = float(score.get('quality', 0) or 0)
+                completeness = float(score.get('completeness', 0) or 0)
+                innovation = float(score.get('innovation', 0) or 0)
                 analysis_score = calculate_analysis_score(quality, completeness, innovation)
                 team_scores[team]['analysis_score'] += analysis_score
                 team_scores[team]['analysis_count'] += 1
@@ -788,22 +788,22 @@ def update_charts(data_json):
             team_data[team] = {'ml_scores': [], 'llm_scores': [], 'analysis_scores': []}
         
         if score_type == 'ml':
-            r2 = float(score.get('r2_score', 0))
-            rmse = float(score.get('rmse', 0))
-            mse = float(score.get('mse', 0))
+            r2 = float(score.get('r2_score', 0) or 0)
+            rmse = float(score.get('rmse', 0) or 0)
+            mse = float(score.get('mse', 0) or 0)
             ml_score = calculate_ml_score(rmse, mse, r2)
             team_data[team]['ml_scores'].append(ml_score)
         elif score_type == 'llm':
-            creativity = float(score.get('creativity', 0))
-            accuracy = float(score.get('accuracy', 0))
-            speed = float(score.get('speed', 0))
+            creativity = float(score.get('creativity', 0) or 0)
+            accuracy = float(score.get('accuracy', 0) or 0)
+            speed = float(score.get('speed', 0) or 0)
             llm_score = calculate_llm_score(creativity, accuracy, speed)
             team_data[team]['llm_scores'].append(llm_score)
             llm_data.append({'team': team, 'speed': speed, 'accuracy': accuracy, 'creativity': creativity})
         elif score_type == 'analysis':
-            quality = float(score.get('quality', 0))
-            completeness = float(score.get('completeness', 0))
-            innovation = float(score.get('innovation', 0))
+            quality = float(score.get('quality', 0) or 0)
+            completeness = float(score.get('completeness', 0) or 0)
+            innovation = float(score.get('innovation', 0) or 0)
             analysis_score = calculate_analysis_score(quality, completeness, innovation)
             team_data[team]['analysis_scores'].append(analysis_score)
     
