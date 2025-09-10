@@ -1,16 +1,15 @@
 """
 Hackathon Webapp - UK Housing Market Challenge
-Fetches group metrics from DagsHub and provides scoring interface
+Railway Deployment Version
+Manual scoring interface without CSV persistence
 """
 
 import os
 import json
 import time
 import requests
-import csv
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import pandas as pd
 
 import dash
 from dash import dcc, html, Input, Output, State, callback_context
@@ -20,138 +19,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # ===== Configuration =====
-DAGSHUB_REPO = "smksean/hackathon-logging"
-DAGSHUB_BASE_URL = f"https://dagshub.com/api/v1/repos/{DAGSHUB_REPO}"
 REFRESH_INTERVAL = 30000  # 30 seconds in milliseconds
-
-# Mock data for development (replace with actual DagsHub API calls)
-MOCK_EXPERIMENTS = [
-    {
-        "id": "exp_001",
-        "team_name": "Group 1",
-        "rmse": 180268.5,
-        "mse": 32496700000.0,
-        "r2_score": 0.847,
-        "creativity": 8.5,
-        "inference_speed": 1.2,
-        "timestamp": datetime.now() - timedelta(minutes=5),
-        "model_type": "Gradient Boosting",
-        "features_used": 15
-    },
-    {
-        "id": "exp_002", 
-        "team_name": "Group 2",
-        "rmse": 195432.1,
-        "mse": 38193700000.0,
-        "r2_score": 0.823,
-        "creativity": 9.2,
-        "inference_speed": 0.8,
-        "timestamp": datetime.now() - timedelta(minutes=12),
-        "model_type": "Neural Network",
-        "features_used": 22
-    },
-    {
-        "id": "exp_003",
-        "team_name": "Group 3", 
-        "rmse": 165789.3,
-        "mse": 27486000000.0,
-        "r2_score": 0.891,
-        "creativity": 7.8,
-        "inference_speed": 2.1,
-        "timestamp": datetime.now() - timedelta(minutes=8),
-        "model_type": "Random Forest",
-        "features_used": 18
-    },
-    {
-        "id": "exp_004",
-        "team_name": "Group 4",
-        "rmse": 210456.7,
-        "mse": 44292000000.0,
-        "r2_score": 0.765,
-        "creativity": 9.5,
-        "inference_speed": 0.6,
-        "timestamp": datetime.now() - timedelta(minutes=15),
-        "model_type": "XGBoost",
-        "features_used": 12
-    }
-]
 
 # Available teams for dropdown
 AVAILABLE_TEAMS = ["Group 1", "Group 2", "Group 3", "Group 4"]
 
-# CSV file for persistent storage
-SCORES_CSV = "hackathon_scores.csv"
+# In-memory storage for scores
+scores_db = []
 
-# Initialize CSV file if it doesn't exist
-def init_scores_csv():
-    if not os.path.exists(SCORES_CSV):
-        with open(SCORES_CSV, 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['timestamp', 'team_name', 'score_type', 'r2_score', 'rmse', 'mse', 
-                           'creativity', 'accuracy', 'speed', 'quality', 'completeness', 
-                           'innovation', 'model_type', 'notes'])
-
-# Load scores from CSV
-def load_scores_from_csv():
-    scores = []
-    if os.path.exists(SCORES_CSV):
-        with open(SCORES_CSV, 'r', newline='') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                scores.append(row)
-    return scores
-
-# Save score to CSV
-def save_score_to_csv(score_data):
-    with open(SCORES_CSV, 'a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([
-            score_data.get('timestamp', ''),
-            score_data.get('team_name', ''),
-            score_data.get('score_type', ''),
-            score_data.get('r2_score', ''),
-            score_data.get('rmse', ''),
-            score_data.get('mse', ''),
-            score_data.get('creativity', ''),
-            score_data.get('accuracy', ''),
-            score_data.get('speed', ''),
-            score_data.get('quality', ''),
-            score_data.get('completeness', ''),
-            score_data.get('innovation', ''),
-            score_data.get('model_type', ''),
-            score_data.get('notes', '')
-        ])
-
-# Initialize CSV file
-init_scores_csv()
-
-# ===== DagsHub Integration =====
-def fetch_dagshub_experiments() -> List[Dict]:
-    """
-    Fetch experiment data from DagsHub API
-    Returns mock data for now - replace with actual API calls
-    """
-    try:
-        # TODO: Replace with actual DagsHub API calls
-        # headers = {"Authorization": f"token {os.getenv('DAGSHUB_TOKEN')}"}
-        # response = requests.get(f"{DAGSHUB_BASE_URL}/experiments", headers=headers)
-        # return response.json()
-        
-        # For now, return mock data with some randomization
-        import random
-        experiments = []
-        for exp in MOCK_EXPERIMENTS:
-            exp_copy = exp.copy()
-            # Add some randomness to simulate live updates
-            exp_copy["accuracy"] += random.uniform(-0.01, 0.01)
-            exp_copy["creativity"] += random.uniform(-0.2, 0.2)
-            exp_copy["inference_speed"] += random.uniform(-0.1, 0.1)
-            experiments.append(exp_copy)
-        return experiments
-    except Exception as e:
-        print(f"Error fetching DagsHub data: {e}")
-        return MOCK_EXPERIMENTS
-
+# ===== Scoring Functions =====
 def calculate_ml_score(rmse: float, mse: float, r2_score: float) -> float:
     """Calculate ML model performance score (0-100)"""
     # Normalize metrics to 0-100 scale
@@ -266,7 +142,7 @@ def create_ml_scoring_interface():
         dbc.CardHeader([
             html.H4([
                 html.I(className="fas fa-brain me-2", style={"color": "#3498db"}),
-                "ML Model Scoring (DagsHub Metrics)"
+                "ML Model Scoring"
             ], className="mb-0")
         ]),
         dbc.CardBody([
@@ -577,8 +453,7 @@ app.layout = dbc.Container([
 )
 def update_time_and_data(n_intervals):
     current_time = datetime.now().strftime("%H:%M:%S")
-    experiments = fetch_dagshub_experiments()
-    return current_time, json.dumps(experiments, default=str)
+    return current_time, json.dumps(scores_db, default=str)
 
 @app.callback(
     [Output("leaderboard-content", "children"),
@@ -591,46 +466,40 @@ def update_leaderboard(data_json):
     if not data_json:
         return "Loading...", "0.0", "0.0", "0.0"
     
-    # Load scores from CSV
-    csv_scores = load_scores_from_csv()
-    
-    # Get team data from DagsHub (mock data for now)
-    experiments = json.loads(data_json)
-    
     # Create team summary with all scores
     team_scores = {}
     
-    # Initialize teams
+    # Initialize teams with default values
     for team in AVAILABLE_TEAMS:
         team_scores[team] = {
             'ml_score': 0, 'llm_score': 0, 'analysis_score': 0, 'total_score': 0,
             'ml_count': 0, 'llm_count': 0, 'analysis_count': 0
         }
     
-    # Process CSV scores
-    for score in csv_scores:
+    # Process scores from in-memory storage
+    for score in scores_db:
         team = score['team_name']
         score_type = score['score_type']
         
         if team in team_scores:
             if score_type == 'ml':
-                r2 = float(score.get('r2_score', 0))
-                rmse = float(score.get('rmse', 0))
-                mse = float(score.get('mse', 0))
+                r2 = float(score.get('r2_score', 0) or 0)
+                rmse = float(score.get('rmse', 0) or 0)
+                mse = float(score.get('mse', 0) or 0)
                 ml_score = calculate_ml_score(rmse, mse, r2)
                 team_scores[team]['ml_score'] += ml_score
                 team_scores[team]['ml_count'] += 1
             elif score_type == 'llm':
-                creativity = float(score.get('creativity', 0))
-                accuracy = float(score.get('accuracy', 0))
-                speed = float(score.get('speed', 0))
+                creativity = float(score.get('creativity', 0) or 0)
+                accuracy = float(score.get('accuracy', 0) or 0)
+                speed = float(score.get('speed', 0) or 0)
                 llm_score = calculate_llm_score(creativity, accuracy, speed)
                 team_scores[team]['llm_score'] += llm_score
                 team_scores[team]['llm_count'] += 1
             elif score_type == 'analysis':
-                quality = float(score.get('quality', 0))
-                completeness = float(score.get('completeness', 0))
-                innovation = float(score.get('innovation', 0))
+                quality = float(score.get('quality', 0) or 0)
+                completeness = float(score.get('completeness', 0) or 0)
+                innovation = float(score.get('innovation', 0) or 0)
                 analysis_score = calculate_analysis_score(quality, completeness, innovation)
                 team_scores[team]['analysis_score'] += analysis_score
                 team_scores[team]['analysis_count'] += 1
@@ -638,10 +507,10 @@ def update_leaderboard(data_json):
     # Calculate averages and total scores
     leaderboard_data = []
     for team, scores in team_scores.items():
-        # Calculate averages
-        avg_ml = scores['ml_score'] / max(1, scores['ml_count'])
-        avg_llm = scores['llm_score'] / max(1, scores['llm_count'])
-        avg_analysis = scores['analysis_score'] / max(1, scores['analysis_count'])
+        # Calculate averages (show 0 if no scores yet)
+        avg_ml = scores['ml_score'] / max(1, scores['ml_count']) if scores['ml_count'] > 0 else 0
+        avg_llm = scores['llm_score'] / max(1, scores['llm_count']) if scores['llm_count'] > 0 else 0
+        avg_analysis = scores['analysis_score'] / max(1, scores['analysis_count']) if scores['analysis_count'] > 0 else 0
         
         # Calculate total score
         total_score = calculate_total_score(avg_ml, avg_llm, avg_analysis)
@@ -693,11 +562,51 @@ def update_leaderboard(data_json):
                 html.Small("Total Score", className="text-muted")
             ], width=2),
             dbc.Col([
-                html.Small(f"ML:{team_scores[team_data['team_name']]['ml_count']} LLM:{team_scores[team_data['team_name']]['llm_count']} A:{team_scores[team_data['team_name']]['analysis_count']}", 
+                html.Small(f"ML:{team_scores[team_data['team_name']]['ml_count']} LLM:{team_scores[team_data['team_name']]['llm_count']} A:{team_scores[team_data['team']]['analysis_count']}", 
                           className="text-muted")
             ], width=1)
         ], className="mb-2 p-2 border rounded")
         leaderboard_rows.append(row)
+    
+    # If no leaderboard rows created, show empty teams
+    if not leaderboard_rows:
+        for i, team in enumerate(AVAILABLE_TEAMS):
+            rank_icon = f"{i+1}."
+            row = dbc.Row([
+                dbc.Col([
+                    html.H5(f"{rank_icon} {team}", 
+                           className="mb-1", 
+                           style={"color": "#2c3e50"})
+                ], width=3),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("ML Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("LLM Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("Analysis Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("Total Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Small("No scores yet", className="text-muted")
+                ], width=1)
+            ], className="mb-2 p-2 border rounded")
+            leaderboard_rows.append(row)
     
     # Calculate overall averages
     if leaderboard_data:
@@ -718,20 +627,17 @@ def update_charts(data_json):
     if not data_json:
         return {}, {}
     
-    # Load scores from CSV for charts
-    csv_scores = load_scores_from_csv()
-    
-    if not csv_scores:
+    if not scores_db:
         # Return empty charts if no data
         fig1 = px.bar(title="Total Scores by Team")
         fig2 = px.scatter(title="LLM Speed vs Accuracy")
         return fig1, fig2
     
-    # Process CSV scores for charts
+    # Process scores for charts
     team_data = {}
     llm_data = []
     
-    for score in csv_scores:
+    for score in scores_db:
         team = score['team_name']
         score_type = score['score_type']
         
@@ -739,22 +645,22 @@ def update_charts(data_json):
             team_data[team] = {'ml_scores': [], 'llm_scores': [], 'analysis_scores': []}
         
         if score_type == 'ml':
-            r2 = float(score.get('r2_score', 0))
-            rmse = float(score.get('rmse', 0))
-            mse = float(score.get('mse', 0))
+            r2 = float(score.get('r2_score', 0) or 0)
+            rmse = float(score.get('rmse', 0) or 0)
+            mse = float(score.get('mse', 0) or 0)
             ml_score = calculate_ml_score(rmse, mse, r2)
             team_data[team]['ml_scores'].append(ml_score)
         elif score_type == 'llm':
-            creativity = float(score.get('creativity', 0))
-            accuracy = float(score.get('accuracy', 0))
-            speed = float(score.get('speed', 0))
+            creativity = float(score.get('creativity', 0) or 0)
+            accuracy = float(score.get('accuracy', 0) or 0)
+            speed = float(score.get('speed', 0) or 0)
             llm_score = calculate_llm_score(creativity, accuracy, speed)
             team_data[team]['llm_scores'].append(llm_score)
             llm_data.append({'team': team, 'speed': speed, 'accuracy': accuracy, 'creativity': creativity})
         elif score_type == 'analysis':
-            quality = float(score.get('quality', 0))
-            completeness = float(score.get('completeness', 0))
-            innovation = float(score.get('innovation', 0))
+            quality = float(score.get('quality', 0) or 0)
+            completeness = float(score.get('completeness', 0) or 0)
+            innovation = float(score.get('innovation', 0) or 0)
             analysis_score = calculate_analysis_score(quality, completeness, innovation)
             team_data[team]['analysis_scores'].append(analysis_score)
     
@@ -883,7 +789,7 @@ def handle_ml_scoring(submit_clicks, clear_clicks, team_name, model_type, r2, rm
         if not team_name:
             return dbc.Alert("Please select a team!", color="danger"), "", r2, rmse, mse
         
-        # Save to CSV
+        # Save to in-memory storage
         score_data = {
             'timestamp': datetime.now().isoformat(),
             'team_name': team_name,
@@ -893,7 +799,7 @@ def handle_ml_scoring(submit_clicks, clear_clicks, team_name, model_type, r2, rm
             'mse': mse,
             'model_type': model_type
         }
-        save_score_to_csv(score_data)
+        scores_db.append(score_data)
         
         success_msg = f"ML Score submitted for {team_name}: R²={r2:.3f}, RMSE={rmse:,.0f}, MSE={mse:,.0f}"
         return dbc.Alert(success_msg, color="success"), "", 0.8, 180000, 32000000000
@@ -931,7 +837,7 @@ def handle_llm_scoring(submit_clicks, clear_clicks, team_name, model, creativity
         if not team_name:
             return dbc.Alert("Please select a team!", color="danger"), "", creativity, accuracy, speed, notes
         
-        # Save to CSV
+        # Save to in-memory storage
         score_data = {
             'timestamp': datetime.now().isoformat(),
             'team_name': team_name,
@@ -942,7 +848,7 @@ def handle_llm_scoring(submit_clicks, clear_clicks, team_name, model, creativity
             'model_type': model,
             'notes': notes
         }
-        save_score_to_csv(score_data)
+        scores_db.append(score_data)
         
         success_msg = f"LLM Score submitted for {team_name}: Creativity={creativity}, Accuracy={accuracy:.3f}, Speed={speed}s"
         return dbc.Alert(success_msg, color="success"), "", 7.5, 0.8, 1.5, ""
@@ -980,7 +886,7 @@ def handle_analysis_scoring(submit_clicks, clear_clicks, team_name, analysis_typ
         if not team_name:
             return dbc.Alert("Please select a team!", color="danger"), "", quality, completeness, innovation, notes
         
-        # Save to CSV
+        # Save to in-memory storage
         score_data = {
             'timestamp': datetime.now().isoformat(),
             'team_name': team_name,
@@ -991,15 +897,17 @@ def handle_analysis_scoring(submit_clicks, clear_clicks, team_name, analysis_typ
             'model_type': analysis_type,
             'notes': notes
         }
-        save_score_to_csv(score_data)
+        scores_db.append(score_data)
         
         success_msg = f"Analysis Score submitted for {team_name}: Quality={quality}, Completeness={completeness}, Innovation={innovation}"
         return dbc.Alert(success_msg, color="success"), "", 7.5, 8.0, 7.0, ""
     
     return "", "", quality, completeness, innovation, notes
 
-# ===== Main =====
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8051))  # Different port from main dashboard
-    app.run_server(host="127.0.0.1", port=port, debug=True)
+# ===== Server Configuration for Railway =====
+server = app.server
 
+if __name__ == "__main__":
+    # Railway will set the PORT environment variable
+    port = int(os.environ.get("PORT", 8051))
+    app.run_server(host="0.0.0.0", port=port, debug=False)
