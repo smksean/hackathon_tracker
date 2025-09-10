@@ -5,6 +5,7 @@ Manual scoring interface without CSV persistence
 """
 
 import os
+import pandas as pd
 import json
 import time
 import requests
