@@ -1,12 +1,13 @@
 """
 Hackathon Webapp - UK Housing Market Challenge
-Railway Deployment Version (No CSV)
+Railway Deployment Version (No CSV, In-Memory Storage)
 """
 
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 import pandas as pd
+import plotly.express as px
 
 # -----------------------------------------------------------
 # Utility
@@ -23,6 +24,7 @@ def safe_float(val, default=0.0):
 # -----------------------------------------------------------
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server   # 👈 Required for Gunicorn/Railway
 app.title = "UK Housing Hackathon Scoring"
 
 # -----------------------------------------------------------
@@ -33,7 +35,10 @@ app.layout = dbc.Container([
     html.H1("🏠 UK Housing Market Hackathon"),
     html.Hr(),
 
-    # Tabs for scoring
+    # Memory store for scores
+    dcc.Store(id="score-store", data=[]),
+
+    # Tabs
     dcc.Tabs(id="tabs", value="ml", children=[
         dcc.Tab(label="ML Scoring", value="ml"),
         dcc.Tab(label="LLM Scoring", value="llm"),
@@ -94,12 +99,11 @@ def render_tab(tab):
     return html.P("Select a tab to continue.")
 
 # -----------------------------------------------------------
-# Callbacks for Leaderboard + Charts
+# Callbacks: Update Score Store
 # -----------------------------------------------------------
 
 @app.callback(
-    [Output("leaderboard", "children"),
-     Output("charts", "figure")],
+    Output("score-store", "data", allow_duplicate=True),
     [Input("ml-submit", "n_clicks"),
      Input("llm-submit", "n_clicks"),
      Input("analysis-submit", "n_clicks")],
@@ -114,17 +118,20 @@ def render_tab(tab):
      State("analysis-team", "value"),
      State("analysis-depth", "value"),
      State("analysis-clarity", "value"),
-     State("analysis-creativity", "value")]
+     State("analysis-creativity", "value"),
+     State("score-store", "data")],
+    prevent_initial_call=True
 )
 def update_scores(n1, n2, n3,
                   ml_team, ml_acc, ml_innov, ml_expl,
                   llm_team, llm_acc, llm_innov, llm_expl,
-                  an_team, an_depth, an_clarity, an_creativity):
+                  an_team, an_depth, an_clarity, an_creativity,
+                  current_data):
 
-    scores = []
+    data = current_data or []
 
     if ml_team:
-        scores.append({
+        data.append({
             "Team": ml_team,
             "accuracy": safe_float(ml_acc),
             "innovation": safe_float(ml_innov),
@@ -132,7 +139,7 @@ def update_scores(n1, n2, n3,
         })
 
     if llm_team:
-        scores.append({
+        data.append({
             "Team": llm_team,
             "accuracy": safe_float(llm_acc),
             "innovation": safe_float(llm_innov),
@@ -140,24 +147,37 @@ def update_scores(n1, n2, n3,
         })
 
     if an_team:
-        scores.append({
+        data.append({
             "Team": an_team,
             "depth": safe_float(an_depth),
             "clarity": safe_float(an_clarity),
             "creativity": safe_float(an_creativity)
         })
 
-    if not scores:
+    return data
+
+# -----------------------------------------------------------
+# Callbacks: Render Leaderboard + Charts
+# -----------------------------------------------------------
+
+@app.callback(
+    [Output("leaderboard", "children"),
+     Output("charts", "figure")],
+    Input("score-store", "data")
+)
+def render_leaderboard(data):
+    if not data:
         return html.P("No scores yet."), {}
 
-    df = pd.DataFrame(scores)
+    df = pd.DataFrame(data)
 
     # Leaderboard table
     table = dbc.Table.from_dataframe(df, striped=True, bordered=True, hover=True)
 
-    # Simple chart: sum of scores per team
+    # Chart: total score per team
     df["total"] = df.drop(columns=["Team"]).sum(axis=1)
-    fig = df.plot.bar(x="Team", y="total", legend=False, title="Total Scores").get_figure()
+    fig = px.bar(df, x="Team", y="total", title="Total Scores", text="total")
+    fig.update_traces(textposition="outside")
 
     return table, fig
 
