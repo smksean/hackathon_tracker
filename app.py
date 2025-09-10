@@ -609,7 +609,7 @@ def update_leaderboard(data_json):
     # Create team summary with all scores
     team_scores = {}
     
-    # Initialize teams
+    # Initialize teams with default values
     for team in AVAILABLE_TEAMS:
         team_scores[team] = {
             'ml_score': 0, 'llm_score': 0, 'analysis_score': 0, 'total_score': 0,
@@ -647,10 +647,10 @@ def update_leaderboard(data_json):
     # Calculate averages and total scores
     leaderboard_data = []
     for team, scores in team_scores.items():
-        # Calculate averages
-        avg_ml = scores['ml_score'] / max(1, scores['ml_count'])
-        avg_llm = scores['llm_score'] / max(1, scores['llm_count'])
-        avg_analysis = scores['analysis_score'] / max(1, scores['analysis_count'])
+        # Calculate averages (show 0 if no scores yet)
+        avg_ml = scores['ml_score'] / max(1, scores['ml_count']) if scores['ml_count'] > 0 else 0
+        avg_llm = scores['llm_score'] / max(1, scores['llm_count']) if scores['llm_count'] > 0 else 0
+        avg_analysis = scores['analysis_score'] / max(1, scores['analysis_count']) if scores['analysis_count'] > 0 else 0
         
         # Calculate total score
         total_score = calculate_total_score(avg_ml, avg_llm, avg_analysis)
@@ -707,6 +707,46 @@ def update_leaderboard(data_json):
             ], width=1)
         ], className="mb-2 p-2 border rounded")
         leaderboard_rows.append(row)
+    
+    # If no leaderboard rows created, show empty teams
+    if not leaderboard_rows:
+        for i, team in enumerate(AVAILABLE_TEAMS):
+            rank_icon = f"{i+1}."
+            row = dbc.Row([
+                dbc.Col([
+                    html.H5(f"{rank_icon} {team}", 
+                           className="mb-1", 
+                           style={"color": "#2c3e50"})
+                ], width=3),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("ML Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("LLM Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("Analysis Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Span("0.0", 
+                             className="badge me-1", 
+                             style={"background-color": "#bdc3c7", "color": "white"}),
+                    html.Small("Total Score", className="text-muted")
+                ], width=2),
+                dbc.Col([
+                    html.Small("No scores yet", className="text-muted")
+                ], width=1)
+            ], className="mb-2 p-2 border rounded")
+            leaderboard_rows.append(row)
     
     # Calculate overall averages
     if leaderboard_data:
