@@ -1,0 +1,13 @@
+timestamp,team_name,score_type,r2_score,rmse,mse,creativity,accuracy,speed,quality,completeness,innovation,model_type,notes
+2024-01-09T23:30:00,Group 1,ml,0.847,180268.5,32496700000.0,,,,,,,gradient_boosting,Sample ML score
+2024-01-09T23:31:00,Group 1,llm,,,8.5,0.85,1.2,,,,gpt4,Sample LLM score
+2024-01-09T23:32:00,Group 1,analysis,,,,,,7.5,8.0,7.0,eda,Sample analysis score
+2024-01-09T23:33:00,Group 2,ml,0.823,195432.1,38193700000.0,,,,,,,neural_network,Sample ML score
+2024-01-09T23:34:00,Group 2,llm,,,9.2,0.82,0.8,,,,claude,Sample LLM score
+2024-01-09T23:35:00,Group 2,analysis,,,,,,8.0,7.5,8.5,feature_eng,Sample analysis score
+2024-01-09T23:36:00,Group 3,ml,0.891,165789.3,27486000000.0,,,,,,,random_forest,Sample ML score
+2024-01-09T23:37:00,Group 3,llm,,,7.8,0.89,2.1,,,,llama,Sample LLM score
+2024-01-09T23:38:00,Group 3,analysis,,,,,,8.5,9.0,6.5,model_selection,Sample analysis score
+2024-01-09T23:39:00,Group 4,ml,0.765,210456.7,44292000000.0,,,,,,,xgboost,Sample ML score
+2024-01-09T23:40:00,Group 4,llm,,,9.5,0.76,0.6,,,,custom,Sample LLM score
+2024-01-09T23:41:00,Group 4,analysis,,,,,,6.5,7.0,9.0,business_insights,Sample analysis score
